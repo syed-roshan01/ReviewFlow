@@ -1,0 +1,171 @@
+// ReviewFlow AI — Prisma Schema
+// Multi-tenant: shared DB, tenant isolation via tenantId on every table
+// Provider: PostgreSQL (Supabase / Neon)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// TENANT (one row = one business)
+// ─────────────────────────────────────────────
+model Tenant {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique // used in review funnel URL: /r/[slug]
+  googleReviewUrl String
+  phone           String?
+  email           String?
+  logoUrl         String?
+  address         String?
+  aiContext       String?  // Business context for AI review generation
+  planId          String   @default("free") // free | growth | pro
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users            TenantUser[]
+  customers        Customer[]
+  reviewRequests   ReviewRequest[]
+  whatsappMessages WhatsAppMessage[]
+
+  @@map("tenants")
+}
+
+// ─────────────────────────────────────────────
+// TENANT USER (staff accounts tied to a tenant)
+// ─────────────────────────────────────────────
+model TenantUser {
+  id        String   @id @default(cuid())
+  tenantId  String
+  clerkId   String   @unique // Clerk user ID
+  email     String
+  name      String?
+  role      Role     @default(STAFF)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_users")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  STAFF
+}
+
+// ─────────────────────────────────────────────
+// CUSTOMER (light CRM record)
+// ─────────────────────────────────────────────
+model Customer {
+  id          String      @id @default(cuid())
+  tenantId    String
+  name        String
+  phone       String      // E.164 format: +1234567890
+  email       String?
+  tag         CustomerTag @default(NEW)
+  visitCount  Int         @default(1)
+  notes       String?
+  lastVisitAt DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reviewRequests   ReviewRequest[]
+  whatsappMessages WhatsAppMessage[]
+
+  @@unique([tenantId, phone]) // one record per phone per business
+  @@index([tenantId])
+  @@map("customers")
+}
+
+enum CustomerTag {
+  NEW
+  REPEAT
+  VIP
+  AT_RISK
+}
+
+// ─────────────────────────────────────────────
+// REVIEW REQUEST (one per visit/interaction)
+// ─────────────────────────────────────────────
+model ReviewRequest {
+  id              String              @id @default(cuid())
+  tenantId        String
+  customerId      String
+  status          ReviewRequestStatus @default(SENT)
+  rating          Int?                // 1–5, set when customer rates
+  privateFeedback String?             // captured only for ratings ≤ 3
+  redirectedAt    DateTime?           // when they clicked Google link
+  completedAt     DateTime?           // when they submitted
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("review_requests")
+}
+
+enum ReviewRequestStatus {
+  SENT               // WhatsApp sent, not opened
+  OPENED             // Customer opened review page
+  REDIRECTED         // Rating ≥ 4, redirected to Google
+  NEGATIVE_FEEDBACK  // Rating ≤ 3, captured private feedback
+  COMPLETED          // Confirmed completed (optional)
+  EXPIRED            // No response after reminder window
+}
+
+// ─────────────────────────────────────────────
+// WHATSAPP MESSAGE (audit log for all WA sends)
+// ─────────────────────────────────────────────
+model WhatsAppMessage {
+  id           String        @id @default(cuid())
+  tenantId     String
+  customerId   String
+  type         MessageType
+  status       MessageStatus @default(QUEUED)
+  phone        String        // snapshot of phone at send time
+  templateName String?       // WhatsApp template name used
+  provider     String        @default("wati") // wati | twilio | none
+  providerMsgId String?      // ID returned by provider for tracking
+  metadata     Json?         // extra provider-specific data
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  failureReason String?
+  createdAt    DateTime      @default(now())
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("whatsapp_messages")
+}
+
+enum MessageType {
+  REVIEW_REQUEST  // initial ask
+  REVIEW_REMINDER // 24h follow-up
+  THANK_YOU       // post-review thank you
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
