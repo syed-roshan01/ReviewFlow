@@ -58,7 +58,7 @@ export function timeAgo(date: Date): string {
  * Build the public review funnel URL for a tenant.
  */
 export function buildReviewUrl(slug: string): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? "https://review-flow-l5yo.vercel.app";
   return `${base}/r/${slug}`;
 }
 
