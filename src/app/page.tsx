@@ -338,7 +338,7 @@ export default function LandingPage() {
               <div className="bg-white/[0.04] border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-colors">
                 <p className="text-sm font-semibold text-gray-400 mb-2">Starter</p>
                 <div className="flex items-end gap-1 mb-1">
-                  <span className="text-5xl font-black text-white">$0</span>
+                  <span className="text-5xl font-black text-white">₹0</span>
                   <span className="text-gray-500 text-sm mb-2">/month</span>
                 </div>
                 <p className="text-xs text-gray-600 mb-7">Free forever</p>
@@ -355,7 +355,7 @@ export default function LandingPage() {
                 <div className="absolute top-4 right-4 bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">Most popular</div>
                 <p className="text-sm font-semibold text-blue-200 mb-2">Pro</p>
                 <div className="flex items-end gap-1 mb-1">
-                  <span className="text-5xl font-black text-white">$29</span>
+                  <span className="text-5xl font-black text-white">₹2,499</span>
                   <span className="text-blue-200 text-sm mb-2">/month</span>
                 </div>
                 <p className="text-xs text-blue-200/70 mb-7">Billed monthly</p>
